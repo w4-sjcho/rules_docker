@@ -100,7 +100,7 @@ _container_pull_attrs = {
 }
 
 def _impl(repository_ctx):
-    """Core implementation of container_pull."""
+    """Implementation of container_pull."""
 
     # Add an empty top-level BUILD file.
     repository_ctx.file("BUILD", "")
@@ -178,7 +178,7 @@ exports_files(["image.digest", "digest"])
 
     result = repository_ctx.execute(args, **kwargs)
     if result.return_code:
-        fail("Pull command failed: %s (%s)" % (result.stderr, " ".join(args)))
+        fail("Pull command failed: %s (%s)" % (result.stderr, " ".join([str(a) for a in args])))
 
     updated_attrs = {
         k: getattr(repository_ctx.attr, k)

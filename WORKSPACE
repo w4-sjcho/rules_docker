@@ -34,6 +34,28 @@ load(
 container_repositories()
 
 load(
+    "//container:new_pull.bzl",
+    "new_container_pull",
+)
+
+# These are for testing the new container push
+new_container_pull(
+    name = "new_alpine_linux_armv6",
+    architecture = "arm",
+    cpu_variant = "v6",
+    os = "linux",
+    registry = "index.docker.io",
+    repository = "library/alpine",
+    tag = "3.8",
+)
+
+new_container_pull(
+    name = "new_distroless_base",
+    registry = "gcr.io",
+    repository = "distroless/base",
+)
+
+load(
     "//container:container.bzl",
     "container_load",
     "container_pull",
@@ -178,9 +200,9 @@ jvm_maven_import_external(
 # For our scala_image test.
 http_archive(
     name = "io_bazel_rules_scala",
-    sha256 = "5986f9a7852b4dc7e30d6e201990bcf277fe91608d1ac7ec0834909facb71b85",
-    strip_prefix = "rules_scala-300b4369a0a56d9e590d9fea8a73c3913d758e12",
-    urls = ["https://github.com/bazelbuild/rules_scala/archive/300b4369a0a56d9e590d9fea8a73c3913d758e12.tar.gz"],
+    sha256 = "13653fbea1a7a3978b1929ee9894397feac0b6ca49ab5ec892917bdb1a8e9dab",
+    strip_prefix = "rules_scala-24b06eec5cedc25085203d588cca99e894a62345",
+    urls = ["https://github.com/bazelbuild/rules_scala/archive/24b06eec5cedc25085203d588cca99e894a62345.tar.gz"],
 )
 
 load("@io_bazel_rules_scala//scala:scala.bzl", "scala_repositories")
@@ -206,10 +228,10 @@ groovy_repositories()
 # For our go_image test.
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "a82a352bffae6bee4e95f68a8d80a70e87f42c4741e6a448bec11998fcc82329",
+    sha256 = "f04d2373bcaf8aa09bccb08a98a57e721306c8f6043a2a0ee610fd6853dcde3d",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/0.18.5/rules_go-0.18.5.tar.gz",
-        "https://github.com/bazelbuild/rules_go/releases/download/0.18.5/rules_go-0.18.5.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_go/releases/download/0.18.6/rules_go-0.18.6.tar.gz",
+        "https://github.com/bazelbuild/rules_go/releases/download/0.18.6/rules_go-0.18.6.tar.gz",
     ],
 )
 
@@ -234,9 +256,9 @@ _go_image_repos()
 # For our rust_image test
 http_archive(
     name = "io_bazel_rules_rust",
-    sha256 = "2183e4fa62d0ebea3da1dd94ba7e64e02fb97ffa084972fb1a49f5f3a6cd7219",
-    strip_prefix = "rules_rust-adccbbad58411657102ab8168aee7c5f4ff3af4c",
-    urls = ["https://github.com/bazelbuild/rules_rust/archive/adccbbad58411657102ab8168aee7c5f4ff3af4c.tar.gz"],
+    sha256 = "29d9fc1cdbd737c51db5983d1ac8e64cdc684c4683bafbcc624d3d81de92a32f",
+    strip_prefix = "rules_rust-8417c8954efbd0cefc8dd84517b2afff5e907d5a",
+    urls = ["https://github.com/bazelbuild/rules_rust/archive/8417c8954efbd0cefc8dd84517b2afff5e907d5a.tar.gz"],
 )
 
 load("@io_bazel_rules_rust//rust:repositories.bzl", "rust_repositories")
@@ -252,9 +274,9 @@ bazel_version(name = "bazel_version")
 # For our d_image test
 http_archive(
     name = "io_bazel_rules_d",
-    sha256 = "0073995c6e66b211f0e3f7d055e9f4dd4b3e38f3ae4995d963fbec76886ef405",
-    strip_prefix = "rules_d-4602eae4dc9937d3a0b81d79f60b716d1d05f8fa",
-    urls = ["https://github.com/bazelbuild/rules_d/archive/4602eae4dc9937d3a0b81d79f60b716d1d05f8fa.tar.gz"],
+    sha256 = "bf8d7e7d76f4abef5a732614ac06c0ccffbe5aa5fdc983ea4fa3a81ec68e1f8c",
+    strip_prefix = "rules_d-0579d30b7667a04b252489ab130b449882a7bdba",
+    urls = ["https://github.com/bazelbuild/rules_d/archive/0579d30b7667a04b252489ab130b449882a7bdba.tar.gz"],
 )
 
 load("@io_bazel_rules_d//d:d.bzl", "d_repositories")
@@ -288,23 +310,46 @@ _nodejs_image_repos()
 load("//contrib:dockerfile_build.bzl", "dockerfile_image")
 
 dockerfile_image(
-    name = "basic_dockerfile",
+    name = "dockerfile_docker",
     build_args = {
         "ALPINE_version": "3.9",
     },
-    dockerfile = "//contrib:Dockerfile",
+    dockerfile = "//testdata/dockerfile_build:Dockerfile",
 )
+
+[dockerfile_image(
+    name = "dockerfile_kaniko_%s" % tag,
+    build_args = {
+        "ALPINE_version": "3.9",
+    },
+    dockerfile = "//testdata/dockerfile_build:Dockerfile",
+    driver = "kaniko",
+    kaniko_tag = tag,
+) for tag in [
+    "latest",
+    "debug",
+]]
+
+# Load the image tarball.
+[container_load(
+    name = "loaded_dockerfile_image_%s" % driver,
+    file = "@dockerfile_%s//image:dockerfile_image.tar" % driver,
+) for driver in [
+    "docker",
+    "kaniko_latest",
+    "kaniko_debug",
+]]
 
 # Register the default py_toolchain for containerized execution
 register_toolchains("//toolchains/python:container_py_toolchain")
 
 http_archive(
     name = "bazel_toolchains",
-    sha256 = "36e5cb9f15543faa195daa9ee9c8a7f0306f6b4f3e407ffcdb9410884d9ac4de",
-    strip_prefix = "bazel-toolchains-0.25.0",
+    sha256 = "e76afea244b1767e19fb38e1f1be448ebdf48d52ade0b3687c5794d8a1362fe8",
+    strip_prefix = "bazel-toolchains-0.26.3",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.25.0.tar.gz",
-        "https://github.com/bazelbuild/bazel-toolchains/archive/0.25.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.26.3.tar.gz",
+        "https://github.com/bazelbuild/bazel-toolchains/archive/0.26.3.tar.gz",
     ],
 )
 
@@ -314,8 +359,16 @@ rbe_autoconfig(
     name = "buildkite_config",
 )
 
+# gazelle:repo bazel_gazelle
+
 go_repository(
     name = "com_github_google_go_containerregistry",
-    commit = "1c6c7f61e8a5402b606c3c6db169fdcd1b0712b7",
+    commit = "6991786f93129be24f857070fe94754a9ea02a0a",
     importpath = "github.com/google/go-containerregistry",
+)
+
+go_repository(
+    name = "com_github_pkg_errors",
+    commit = "27936f6d90f9c8e1145f11ed52ffffbfdb9e0af7",
+    importpath = "github.com/pkg/errors",
 )
